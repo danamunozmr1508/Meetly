@@ -3,10 +3,9 @@ import { authOptions } from "../auth/[...nextauth]";
 import { google } from "googleapis";
 
 export default async function handler(req, res) {
-
   const session = await getServerSession(req, res, authOptions);
 
-  if (!session) {
+  if (!session || !session.accessToken) {
     return res.status(401).json({ error: "No autenticado" });
   }
 
@@ -15,6 +14,7 @@ export default async function handler(req, res) {
   try {
 
     const auth = new google.auth.OAuth2();
+
     auth.setCredentials({
       access_token: session.accessToken,
     });
@@ -32,18 +32,19 @@ export default async function handler(req, res) {
       },
     });
 
-    const busy = response.data.calendars.primary.busy;
+    const busy =
+      response.data.calendars?.primary?.busy || [];
 
     res.status(200).json({
       busy,
     });
 
-  } catch (error) {
+  } catch (err) {
 
-    console.error("FREEBUSY ERROR:", error);
+    console.error("FREEBUSY ERROR:", err);
 
     res.status(500).json({
-      error: error.message,
+      error: err.message,
     });
 
   }
