@@ -98,7 +98,7 @@ export default function App() {
       aL("Consultando tu Google Calendar...");
       const from=new Date(rs);from.setHours(0,0,0,0);
       const to=new Date(re);to.setHours(23,59,59,999);
-      const evRes=await fetch("/api/calendar/events?from="+from.toISOString()+"&to="+to.toISOString());
+      const evRes=await fetch("/api/calendar/freebusy?from="+from.toISOString()+"&to="+to.toISOString());
       if(!evRes.ok)throw new Error("Error consultando calendario");
       const { events: evs }=await evRes.json();
       aL(evs.length+" eventos en el rango.");
