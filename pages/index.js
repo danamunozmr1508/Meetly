@@ -100,8 +100,8 @@ export default function App() {
       const to=new Date(re);to.setHours(23,59,59,999);
       const evRes=await fetch("/api/calendar/freebusy?from="+from.toISOString()+"&to="+to.toISOString());
       if(!evRes.ok)throw new Error("Error consultando calendario");
-      const { events: evs }=await evRes.json();
-      aL(evs.length+" eventos en el rango.");
+      const { busy: evs } = await evRes.json();
+      aL(evs.length+" bloques ocupados en el rango.");
       setAppStatus("scheduling");
       aL("Buscando espacio de "+dur+" min...");
       const slot=(()=>{

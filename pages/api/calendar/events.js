@@ -2,17 +2,51 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]";
 import { google } from "googleapis";
 
+// función para renovar el access token usando refresh token
+async function refreshAccessToken(refreshToken) {
+  const auth = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET
+  );
+
+  auth.setCredentials({
+    refresh_token: refreshToken,
+  });
+
+  const { credentials } = await auth.refreshAccessToken();
+  return credentials.access_token;
+}
+
 export default async function handler(req, res) {
+
   const session = await getServerSession(req, res, authOptions);
-  if (!session) return res.status(401).json({ error: "No autenticado" });
-  
+
+  if (!session) {
+    return res.status(401).json({ error: "No autenticado" });
+  }
+
   const { from, to } = req.query;
-  
+
   try {
+
+    let accessToken = session.accessToken;
+
+    // si el token expiró, usar refresh token
+    if (session.expiresAt && Date.now() > session.expiresAt && session.refreshToken) {
+      console.log("Token expirado, renovando...");
+      accessToken = await refreshAccessToken(session.refreshToken);
+    }
+
     const auth = new google.auth.OAuth2();
-    auth.setCredentials({ access_token: session.accessToken });
-    
-    const cal = google.calendar({ version: "v3", auth });
+    auth.setCredentials({
+      access_token: accessToken,
+    });
+
+    const cal = google.calendar({
+      version: "v3",
+      auth,
+    });
+
     const r = await cal.events.list({
       calendarId: "primary",
       timeMin: from,
@@ -20,15 +54,14 @@ export default async function handler(req, res) {
       singleEvents: true,
       orderBy: "startTime",
     });
-    
-    // 🔹 1. Mapear eventos
+
     const events = (r.data.items || []).map(e => ({
       start: e.start?.dateTime || e.start?.date,
       end: e.end?.dateTime || e.end?.date,
     }));
 
-    // 🔹 2. Función para encontrar espacio disponible
     function findAvailableSlot(events, from, to, durationMinutes = 15) {
+
       const WORK_START_HOUR = 7;
       const WORK_START_MINUTE = 30;
       const WORK_END_HOUR = 17;
@@ -67,14 +100,15 @@ export default async function handler(req, res) {
 
         for (const event of dayEvents) {
 
-          // Saltar almuerzo
           if (pointer < lunchStart && event.start > lunchStart) {
+
             if ((lunchStart - pointer) / 60000 >= durationMinutes) {
               return {
                 start: pointer,
                 end: new Date(pointer.getTime() + durationMinutes * 60000),
               };
             }
+
             pointer = lunchEnd;
           }
 
@@ -103,17 +137,20 @@ export default async function handler(req, res) {
       return null;
     }
 
-    // 🔹 3. Buscar espacio de 15 minutos
     const availableSlot = findAvailableSlot(events, from, to, 15);
 
-    // 🔹 4. Responder con eventos + disponibilidad
     res.status(200).json({
       events,
       availableSlot,
     });
 
-  } catch(err) {
-  console.error("CALENDAR ERROR:", err);
-  res.status(500).json({ error: err.message });
-}
+  } catch (err) {
+
+    console.error("CALENDAR ERROR:", err);
+
+    res.status(500).json({
+      error: err.message,
+    });
+
+  }
 }
