@@ -1,8 +1,14 @@
 export default async function handler(req, res) {
 
-  const { text, user_name } = req.body;
+  if (req.method !== "POST") {
+    return res.status(200).json({
+      message: "Slack endpoint working"
+    });
+  }
 
-  const parts = text.split(" ");
+  const { text, user_name } = req.body || {};
+
+  const parts = (text || "").split(" ");
 
   const duration = parts[0];
   const emails = parts.slice(1);
