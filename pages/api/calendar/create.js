@@ -15,13 +15,18 @@ export default async function handler(req, res) {
     auth.setCredentials({ access_token: session.accessToken });
     
     const cal = google.calendar({ version: "v3", auth });
+
+    const organizerEmail = session.user.email;
+    const allAttendees = Array.from(
+      new Set([organizerEmail, ...attendees])
+    );  
     
     const event = {
       summary: title || "Reunion",
       description,
       start: { dateTime: start, timeZone: "America/Bogota" },
       end: { dateTime: end, timeZone: "America/Bogota" },
-      attendees: attendees.map(email => ({ email })),
+      attendees: allAttendees.map(email => ({ email })),
       ...(addMeet && { conferenceData: { createRequest: {
         requestId: Math.random().toString(36).slice(2),
         conferenceSolutionKey: { type: "hangoutsMeet" },
